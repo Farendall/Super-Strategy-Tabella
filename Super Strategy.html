@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SUPER Strategy Modified</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            line-height: 1.6;
+            margin: 20px;
+            background-color: #000000;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1, h2 {
+            color: #555;
+            text-align: center;
+            width: 100%;
+        }
+        #controls, #status-area, #spin-history, #active-numbers {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 800px;
+            box-sizing: border-box;
+        }
+        #controls {
+             display: flex;
+             flex-wrap: wrap;
+             align-items: center;
+             gap: 10px;
+        }
+        #controls label {
+             margin-right: 5px;
+        }
+        #controls input[type="number"] {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 60px;
+            text-align: center;
+        }
+        #controls button {
+            padding: 10px 15px;
+            background-color: #5cb85c;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        #controls button:hover {
+            background-color: #4cae4c;
+        }
+        #reset-button {
+            background-color: #d9534f;
+            margin-left: auto;
+        }
+        #reset-button:hover {
+            background-color: #c9302c;
+        }
+        #status-area p {
+            margin: 5px 0;
+        }
+        #bankroll {
+            font-weight: bold;
+            transition: color 0.3s ease;
+        }
+        .bankroll-green {
+            color: green;
+        }
+        .color-red { color: red; }
+        .color-black { color: black; }
+        .color-green { color: green; }
+        .bet-1 {
+            color: red;
+            font-weight: bold;
+        }
+        .bet-2 {
+            color: blue;
+            font-weight: bold;
+        }
+        #spin-history {
+            max-height: 150px;
+            overflow-y: auto;
+            border: 1px solid #eee;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+        }
+        #spin-history span {
+             margin-right: 8px;
+             font-weight: bold;
+        }
+         #spin-history span.color-red { color: red; }
+         #spin-history span.color-black { color: black; }
+         #spin-history span.color-green { color: green; }
+        #zero-status-container {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        #active-numbers {
+            background-color: #f0f8ff;
+            border: 2px solid #4682b4;
+        }
+        #active-numbers h3 {
+            margin-top: 0;
+            color: #4682b4;
+            text-align: center;
+        }
+        .active-number-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+            align-items: center;
+        }
+        .active-number {
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 16px;
+            min-width: 35px;
+            text-align: center;
+            border: 2px solid;
+        }
+        .active-number.bet-1 {
+            background-color: #ffe0e0;
+            color: red;
+            border-color: red;
+        }
+        .active-number.bet-2 {
+            background-color: #e0e0ff;
+            color: blue;
+            border-color: blue;
+        }
+        .no-active {
+            color: #888;
+            font-style: italic;
+            text-align: center;
+            padding: 20px;
+        }
+        .strategy-version {
+            margin-top: -10px;
+            color: #888;
+            font-style: italic;
+            text-align: center;
+            margin-bottom: 20px; 
+        }
+    </style>
+</head>
+<body>
+    <h1 style="color: #fff;">SUPER Strategy</h1>
+    <div class="strategy-version" style="color: #fff;">Reset when exceeding the initial bankroll</div>
+    <div id="controls">
+        <label for="winning-number">Number drawn (0-36):</label>
+        <input type="number" id="winning-number" min="0" max="36" value="">
+        <button id="submit-number">Submit Number</button>
+        <button id="reset-button">New Game (Reset)</button>
+    </div>
+    <div id="status-area">
+        <p>Bankroll: <span id="bankroll">100.00</span> Units</p>
+        <p>Total bet this round: <span id="total-bet">0.00</span> Units</p>
+        <p id="zero-status-container" style="display: none;">Zero: <span id="zero-status"></span></p>
+    </div>
+    <h2 style="color: #fff;">Spin History</h2>
+    <div id="spin-history">
+    </div>
+    <div id="active-numbers">
+        <h3>🎯 Numbers in Play</h3>
+        <div class="active-number-grid" id="active-number-grid">
+            <div class="no-active">No active numbers at the moment</div>
+        </div>
+    </div>
+    <script>
+        // --- Configuration ---
+        const START_NUMBER = 3;
+        const INITIAL_BANKROLL = 100;
+        const WIN_PAYOUT = 35;
+        const MAX_ACTIVE_GROUPS = 4;
+        // --- Helper Data (Standard European Roulette Colors 0-36) ---
+        const ROULETTE_COLORS = {
+            0: 'green',
+            red: [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36],
+            black: [2, 4, 6, 8, 10, 11, 13, 15, 17, 20, 22, 24, 26, 28, 29, 31, 33, 35]
+        };
+        function getNumberColor(number) {
+            if (number === 0) return ROULETTE_COLORS[0];
+            if (ROULETTE_COLORS.red.includes(number)) return 'red';
+            if (ROULETTE_COLORS.black.includes(number)) return 'black';
+            return 'unknown';
+        }
+        // --- Table Generation ---
+        let tableNumbers = [];
+        let groups = [];
+        let numberToGroupIndex = {};
+        function generateEurekaTable(startNumber) {
+            const table = [];
+            groups = [];
+            numberToGroupIndex = {};
+            for (let i = 0; i < 4; i++) {
+                table[i] = [];
+                for (let j = 0; j < 9; j++) {
+                    let number;
+                    if (i === 0) {
+                        if (j === 0) {
+                            number = startNumber;
+                        } else {
+                            number = ((table[i][j - 1] - 1 + 11) % 36) + 1;
+                        }
+                    } else {
+                        number = ((table[i - 1][j] - 1 + 27) % 36) + 1;
+                    }
+                    table[i][j] = number;
+                }
+            }
+            let groupIndex = 0;
+            for (let i = 0; i < 4; i++) {
+                for (let j = 0; j < 9; j += 3) {
+                    const group = [table[i][j], table[i][j + 1], table[i][j + 2]];
+                    groups[groupIndex] = group;
+                    group.forEach(num => {
+                        numberToGroupIndex[num] = groupIndex;
+                    });
+                    groupIndex++;
+                }
+            }
+            return table;
+        }
+        // --- State Management ---
+        let state = {
+            bankroll: INITIAL_BANKROLL,
+            history: [],
+            activeNumbers: {},
+            lastRed: null,
+            lastBlack: null,
+            isZeroInitiallyHit: false,
+            nextGroupStake: 1
+        };
+        // --- UI Rendering ---
+        function updateUI() {
+            const bankrollSpan = document.getElementById('bankroll');
+            bankrollSpan.textContent = state.bankroll.toFixed(2);
+            bankrollSpan.classList.remove('bankroll-green');
+            if (state.bankroll > INITIAL_BANKROLL) {
+                bankrollSpan.classList.add('bankroll-green');
+            }
+            let totalBet = 0;
+            for (const numKey in state.activeNumbers) {
+                totalBet += state.activeNumbers[numKey];
+            }
+            document.getElementById('total-bet').textContent = totalBet.toFixed(2);
+            const historyDiv = document.getElementById('spin-history');
+            historyDiv.innerHTML = '';
+            if (state.history.length === 0) {
+                historyDiv.innerHTML = '<em>No spins yet</em>';
+            } else {
+                state.history.forEach(spin => {
+                    const span = document.createElement('span');
+                    span.textContent = spin.number;
+                    span.classList.add('color-' + spin.color);
+                    historyDiv.appendChild(span);
+                });
+                historyDiv.scrollTop = historyDiv.scrollHeight;
+            }
+            updateActiveNumbers();
+            const zeroStatusContainer = document.getElementById('zero-status-container');
+            const zeroStatusSpan = document.getElementById('zero-status');
+            if (state.activeNumbers[0]) {
+                 zeroStatusContainer.style.display = 'block';
+                 zeroStatusSpan.textContent = `0 @ ${state.activeNumbers[0]} Units`;
+                 zeroStatusSpan.classList.remove('bet-1', 'bet-2');
+                 zeroStatusSpan.classList.add('bet-' + state.activeNumbers[0]);
+            } else {
+                zeroStatusContainer.style.display = 'none';
+                zeroStatusSpan.textContent = '';
+                 zeroStatusSpan.classList.remove('bet-1', 'bet-2');
+            }
+        }
+        function updateActiveNumbers() {
+            const activeNumberGrid = document.getElementById('active-number-grid');
+            activeNumberGrid.innerHTML = '';
+            const activeNums = Object.keys(state.activeNumbers).filter(numStr => state.activeNumbers[parseInt(numStr)] > 0);
+            if (activeNums.length === 0) {
+                activeNumberGrid.innerHTML = '<div class="no-active">No active numbers at the moment</div>';
+                return;
+            }
+            activeNums.sort((a, b) => {
+                const numA = parseInt(a);
+                const numB = parseInt(b);
+                if (numA === 0) return -1;
+                if (numB === 0) return 1;
+                return numA - numB;
+            });
+            activeNums.forEach(numStr => {
+                const number = parseInt(numStr);
+                const stake = state.activeNumbers[number];
+                const numberDiv = document.createElement('div');
+                numberDiv.className = `active-number bet-${stake}`;
+                numberDiv.textContent = number;
+                activeNumberGrid.appendChild(numberDiv);
+            });
+        }
+        // --- Game Logic ---
+        function processSpin(winningNumber) {
+            if (winningNumber < 0 || winningNumber > 36 || isNaN(winningNumber)) {
+                alert("Please enter a valid number between 0 and 36.");
+                return;
+            }
+            const numberColor = getNumberColor(winningNumber);
+            const totalBetThisSpin = Object.values(state.activeNumbers).reduce((sum, stake) => sum + stake, 0);
+            const stakeOnWinningNumber = state.activeNumbers[winningNumber] || 0;
+            let netWin = 0;
+            let isWin = false;
+            if (winningNumber === 0) {
+                if (state.activeNumbers[0]) {
+                    isWin = true;
+                    netWin = (WIN_PAYOUT * stakeOnWinningNumber + stakeOnWinningNumber) - totalBetThisSpin;
+                    state.bankroll += netWin;
+                    state.activeNumbers = {}; 
+                    state.isZeroInitiallyHit = false;
+                    state.nextGroupStake = (state.bankroll < INITIAL_BANKROLL) ? 2 : 1;
+                } else {
+                    state.bankroll -= totalBetThisSpin;
+                    state.isZeroInitiallyHit = true;
+                    state.activeNumbers[0] = 1; 
+                }
+            } else {
+                if (stakeOnWinningNumber > 0) {
+                    isWin = true;
+                    netWin = (WIN_PAYOUT * stakeOnWinningNumber + stakeOnWinningNumber) - totalBetThisSpin;
+                    state.bankroll += netWin;
+                    state.activeNumbers = {}; 
+                    state.isZeroInitiallyHit = false;
+                    state.nextGroupStake = (state.bankroll < INITIAL_BANKROLL) ? 2 : 1;
+                } else {
+                    state.bankroll -= totalBetThisSpin;
+                }
+            }
+            state.history.push({ number: winningNumber, color: numberColor });
+            if (winningNumber > 0) {
+                const prevSameColor = (numberColor === 'red') ? state.lastRed : state.lastBlack;
+                if (prevSameColor !== null && prevSameColor !== winningNumber) {
+                    const currentGroupIndex = numberToGroupIndex[winningNumber];
+                    const prevGroupIndex = numberToGroupIndex[prevSameColor];
+                    if (currentGroupIndex === prevGroupIndex) {
+                        const activatedGroup = groups[currentGroupIndex];
+                        const activeGroupIndices = new Set(
+                            Object.keys(state.activeNumbers)
+                                .filter(numStr => parseInt(numStr) !== 0 && state.activeNumbers[parseInt(numStr)] > 0)
+                                .map(numStr => numberToGroupIndex[parseInt(numStr)])
+                        );
+                        const currentActiveGroupsCount = activeGroupIndices.size;
+                        const isGroupAlreadyActive = activatedGroup.some(num => state.activeNumbers[num] !== undefined);
+                        if (!isGroupAlreadyActive && currentActiveGroupsCount < MAX_ACTIVE_GROUPS) {
+                            activatedGroup.forEach(num => {
+                                state.activeNumbers[num] = state.nextGroupStake;
+                            });
+                        }
+                    }
+                }
+                if (numberColor === 'red') {
+                    state.lastRed = winningNumber;
+                } else {
+                    state.lastBlack = winningNumber;
+                }
+            }
+            updateUI();
+        }
+        // --- Reset Function ---
+        function resetGame() {
+            state = {
+                bankroll: INITIAL_BANKROLL,
+                history: [],
+                activeNumbers: {},
+                lastRed: null,
+                lastBlack: null,
+                isZeroInitiallyHit: false,
+                nextGroupStake: 1
+            };
+            updateUI();
+            document.getElementById('winning-number').value = '';
+        }
+        // --- Initialization ---
+        document.addEventListener('DOMContentLoaded', () => {
+            tableNumbers = generateEurekaTable(START_NUMBER);
+            document.getElementById('submit-number').addEventListener('click', () => {
+                const winningNumberInput = document.getElementById('winning-number');
+                const winningNumber = parseInt(winningNumberInput.value);
+                processSpin(winningNumber);
+                winningNumberInput.value = '';
+                winningNumberInput.focus();
+            });
+             document.getElementById('winning-number').addEventListener('keypress', (event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    document.getElementById('submit-number').click();
+                }
+             });
+            document.getElementById('reset-button').addEventListener('click', resetGame);
+            updateUI();
+        });
+    </script>
+</body>
+</html>
